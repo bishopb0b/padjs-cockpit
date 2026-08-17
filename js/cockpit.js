@@ -2,6 +2,8 @@
   var Board = window.PadjsBoard;
   var SEED = window.PadjsSeed;
   var board = Board.load(null, SEED);
+  var heldId = null;
+  var mintOpen = false;
   var formError = "";
   var draft = { stuck: "", why: "", unstick: "" };
 
@@ -11,10 +13,13 @@
       if (key === "className") node.className = attrs[key];
       else if (key === "text") node.textContent = attrs[key];
       else if (key.indexOf("on") === 0) node.addEventListener(key.slice(2).toLowerCase(), attrs[key]);
-      else if (attrs[key] !== undefined && attrs[key] !== null) node.setAttribute(key, attrs[key]);
+      else if (attrs[key] === false || attrs[key] == null) return;
+      else if (attrs[key] === true) node.setAttribute(key, "");
+      else node.setAttribute(key, attrs[key]);
     });
     (children || []).forEach(function (child) {
-      if (child) node.appendChild(child);
+      if (typeof child === "string") node.appendChild(document.createTextNode(child));
+      else if (child) node.appendChild(child);
     });
     return node;
   }
@@ -23,251 +28,264 @@
     Board.save(board);
   }
 
-  function renderCard(item, opts) {
-    var isLive = opts && opts.live;
-    var card = el("article", { className: "card" + (isLive ? " live" : item.status === "removed" ? " removed" : "") });
-    var badges = el("div", { className: "badges" });
-    if (item.example) badges.appendChild(el("span", { className: "badge example", text: "Example" }));
-    badges.appendChild(
-      el("span", {
-        className: "badge " + (isLive ? "live" : item.status === "removed" ? "removed" : "waiting"),
-        text: isLive ? "Live" : item.status === "removed" ? "Removed / caused" : "Waiting",
-      })
-    );
-    card.appendChild(badges);
-    card.appendChild(el("h3", { text: "What is stuck" }));
-    card.appendChild(el("p", { className: "stuck", text: item.stuck }));
-    card.appendChild(el("h3", { text: "Why" }));
-    card.appendChild(el("p", { className: "why", text: item.why }));
-    card.appendChild(el("h3", { text: "Yes or act that unsticks it" }));
-    card.appendChild(el("p", { className: "unstick", text: item.unstick }));
+  function labelOf(item) {
+    return item.label || item.stuck;
+  }
 
-    var actions = el("div", { className: "actions" });
-    if (item.status !== "removed" && !isLive) {
-      actions.appendChild(
-        el("button", {
-          className: "secondary",
-          type: "button",
-          text: "Make this the live one",
-          onClick: function () {
-            var result = Board.setLive(board, item.id);
-            if (result.ok) {
-              board = result.board;
-              persist();
-              draw();
-            }
-          },
-        })
-      );
-    }
-    if (item.status !== "removed") {
-      actions.appendChild(
-        el("button", {
-          className: "danger",
-          type: "button",
-          text: "Mark removed / caused",
-          onClick: function () {
-            var result = Board.markRemoved(board, item.id);
-            if (result.ok) {
-              board = result.board;
-              persist();
-              draw();
-            }
-          },
-        })
-      );
-    } else {
-      actions.appendChild(
-        el("button", {
-          className: "secondary",
-          type: "button",
-          text: "Put this back as the live one",
-          onClick: function () {
-            var result = Board.setLive(board, item.id);
-            if (result.ok) {
-              board = result.board;
-              persist();
-              draw();
-            }
-          },
-        })
-      );
-    }
-    card.appendChild(actions);
-    return card;
+  function yesOf(item) {
+    return item.yes || item.unstick;
+  }
+
+  function heldItem() {
+    return board.items.find(function (item) {
+      return item.id === heldId;
+    }) || null;
+  }
+
+  function apply(result) {
+    if (!result.ok) return;
+    board = result.board;
+    heldId = null;
+    persist();
+    draw();
+  }
+
+  function chip(item, kind) {
+    return el(
+      "button",
+      {
+        className:
+          "chip" +
+          (item.example ? " example" : "") +
+          (kind === "caused" ? " caused-chip" : "") +
+          (heldId === item.id ? " held" : ""),
+        type: "button",
+        title: item.stuck + " — " + item.why,
+        onClick: function (event) {
+          event.stopPropagation();
+          heldId = heldId === item.id ? null : item.id;
+          draw();
+        },
+      },
+      [el("b", { text: labelOf(item) })]
+    );
+  }
+
+  function drawWires(live) {
+    var svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("class", "wires");
+    svg.setAttribute("viewBox", "0 0 1000 1000");
+    svg.setAttribute("preserveAspectRatio", "none");
+    svg.setAttribute("aria-hidden", "true");
+    var lines = [
+      [500, 140, 220, 300],
+      [500, 140, 500, 300],
+      [500, 140, 780, 300],
+      [220, 360, 220, 500],
+      [500, 360, 500, 500],
+      [780, 360, 780, 500],
+      [220, 580, 500, 700],
+      [500, 580, 500, 700],
+      [780, 580, 500, 700],
+    ];
+    lines.forEach(function (pts, index) {
+      var line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+      line.setAttribute("x1", pts[0]);
+      line.setAttribute("y1", pts[1]);
+      line.setAttribute("x2", pts[2]);
+      line.setAttribute("y2", pts[3]);
+      if (index > 5 && live) line.setAttribute("class", "to-live");
+      svg.appendChild(line);
+    });
+    return svg;
+  }
+
+  function seatLive() {
+    var item = heldItem();
+    if (!item) return;
+    apply(Board.setLive(board, item.id));
+  }
+
+  function sendCaused() {
+    var item = heldItem();
+    if (!item) return;
+    apply(Board.markRemoved(board, item.id));
   }
 
   function draw() {
     var root = document.getElementById("app");
+    root.className = "app";
     root.replaceChildren();
-    var tally = Board.counts(board);
     var live = Board.liveItem(board);
     var waiting = Board.waitingItems(board);
     var removed = Board.removedItems(board);
+    var holding = heldItem();
 
-    var mast = el("header", { className: "masthead" }, [
-      el("div", {}, [
-        el("p", { className: "eyebrow", text: "PADjs · Ship of state" }),
-        el("h1", { text: "Bottleneck board" }),
-        el("p", {
-          className: "lede",
-          text: "What is stuck, why it is stuck, and the yes or act that would unstick it. One live constraint at a time.",
-        }),
-      ]),
-      el("div", { className: "gauges" }, [
-        el("div", { className: "gauge live" }, [el("b", { text: String(tally.live) }), el("span", { text: "Live" })]),
-        el("div", { className: "gauge waiting" }, [el("b", { text: String(tally.waiting) }), el("span", { text: "Waiting" })]),
-        el("div", { className: "gauge removed" }, [el("b", { text: String(tally.removed) }), el("span", { text: "Caused" })]),
-      ]),
-    ]);
-
-    var liveBox = el("section", { className: "panel live-panel" }, [
-      el("h2", { text: "Live bottleneck" }),
-      live
-        ? renderCard(live, { live: true })
-        : el("p", {
-            className: "empty",
-            text: "Nothing is marked live. Add a bottleneck or pick one waiting item. The ship waits until you name the constraint.",
-          }),
-    ]);
-
-    var staff = el("aside", { className: "panel" }, [
-      el("h2", { text: "You, then staff" }),
-      el("div", { className: "staff" }, [
-        el("div", { className: "you", text: "You" }),
-        el("div", { className: "stem", "aria-hidden": "true" }),
-        el("div", { className: "org" }, [
-          el("div", { className: "staff-card" }, [
-            el("b", { text: "Grok Bot CoS" }),
-            document.createTextNode("Writes only to vault KIP folders."),
-          ]),
-          el("div", { className: "staff-card" }, [
-            el("b", { text: "Claude" }),
-            document.createTextNode("Staff. Not a peer."),
-          ]),
-          el("div", { className: "staff-card" }, [
-            el("b", { text: "Grok CLI" }),
-            document.createTextNode("Staff. Not a peer."),
-          ]),
-        ]),
-      ]),
-      el("p", {
-        className: "rule",
-        text: "Staff sit under you, never beside you. CoS may write only in vault KIP folders. Everything else in the vault is Bob-only.",
-      }),
-      el("div", { className: "bins" }, [
-        el("div", { className: "bin" }, [
-          el("strong", { text: "Report" }),
-          document.createTextNode("What they found. No live mail or calendar here."),
-        ]),
-        el("div", { className: "bin" }, [
-          el("strong", { text: "Proposed do" }),
-          document.createTextNode("An action they want you to take."),
-        ]),
-        el("div", { className: "bin" }, [
-          el("strong", { text: "Proposed edit" }),
-          document.createTextNode("A change they want you to accept."),
-        ]),
-      ]),
-    ]);
-
-    var waitingBox = el("section", { className: "panel" }, [el("h2", { text: "Waiting" })]);
-    if (!waiting.length) {
-      waitingBox.appendChild(el("p", { className: "empty", text: "No other bottlenecks waiting." }));
-    } else {
-      var grid = el("div", { className: "waiting-grid" });
-      waiting.forEach(function (item) {
-        grid.appendChild(renderCard(item));
-      });
-      waitingBox.appendChild(grid);
-    }
-
-    function field(tag, id) {
-      var node = el(tag, { id: id, name: id, required: "required" });
-      node.value = draft[id] || "";
-      node.addEventListener("input", function () {
-        draft[id] = node.value;
-      });
-      return node;
-    }
-
-    var addForm = el("form", {
-      onSubmit: function (event) {
-        event.preventDefault();
-        draft = {
-          stuck: document.getElementById("stuck").value,
-          why: document.getElementById("why").value,
-          unstick: document.getElementById("unstick").value,
-        };
-        var result = Board.addBottleneck(board, draft);
-        if (!result.ok) {
-          formError = result.error;
-          draw();
-          return;
-        }
-        board = result.board;
-        formError = "";
-        draft = { stuck: "", why: "", unstick: "" };
-        persist();
-        draw();
-      },
-    });
-    addForm.appendChild(el("label", { text: "What is stuck" }, [field("input", "stuck")]));
-    addForm.appendChild(el("label", { text: "Why it is stuck" }, [field("textarea", "why")]));
-    addForm.appendChild(
-      el("label", { text: "Yes or act that would unstick it" }, [field("textarea", "unstick")])
+    root.appendChild(
+      el("div", { className: "brand" }, [
+        el("b", { text: "PADjs" }),
+        el("span", { text: "Ship of state" }),
+        el("span", { text: "You · staff · stores · live block" }),
+      ])
     );
-    addForm.appendChild(el("p", { className: "form-error", text: formError }));
-    addForm.appendChild(el("button", { type: "submit", text: "Add bottleneck" }));
 
-    var addBox = el("section", { className: "panel" }, [
-      el("h2", { text: "Add a bottleneck" }),
-      addForm,
-    ]);
-
-    var removedBox = el("section", { className: "panel removed-row" }, [el("h2", { text: "Removed / caused" })]);
-    if (!removed.length) {
-      removedBox.appendChild(
-        el("p", { className: "empty", text: "Nothing marked removed yet. When the yes or act happens, park it here." })
-      );
-    } else {
-      var gone = el("div", { className: "removed-list" });
-      removed.forEach(function (item) {
-        gone.appendChild(renderCard(item));
-      });
-      removedBox.appendChild(gone);
-    }
-
-    var fine = el("p", { className: "fine" }, [
-      document.createTextNode("Rows marked Example are seeds, not live metrics. This page remembers your board in this browser."),
-    ]);
-    if (!board.items.some(function (item) { return item.example; })) {
-      fine.appendChild(
-        el("button", {
-          className: "secondary",
+    var hold = el("aside", { className: "rail hold" }, [el("div", { className: "rail-title", text: "Hold" })]);
+    waiting.forEach(function (item) {
+      hold.appendChild(chip(item, "hold"));
+    });
+    hold.appendChild(
+      el(
+        "button",
+        {
+          className: "mint",
           type: "button",
-          text: "Put the example rows back",
           onClick: function () {
-            board = Board.restoreExamples(board, SEED).board;
-            persist();
+            mintOpen = true;
+            formError = "";
             draw();
           },
-        })
+        },
+        [el("b", { text: "+ New token" })]
+      )
+    );
+
+    var map = el("section", { className: "map", onClick: function () { heldId = null; draw(); } });
+    map.appendChild(drawWires(live));
+    map.appendChild(el("div", { className: "node you" }, [el("b", { text: "You" })]));
+    map.appendChild(
+      el("div", { className: "node staff cos" }, [el("b", { text: "Grok Bot CoS" }), el("small", { text: "KIP folders only" })])
+    );
+    map.appendChild(
+      el("div", { className: "node staff claude" }, [el("b", { text: "Claude" }), el("small", { text: "Staff, not a peer" })])
+    );
+    map.appendChild(
+      el("div", { className: "node staff cli" }, [el("b", { text: "Grok CLI" }), el("small", { text: "Staff, not a peer" })])
+    );
+    map.appendChild(
+      el("div", { className: "node store kip" }, [el("b", { text: "KIP vault" }), el("small", { text: "CoS writes here" })])
+    );
+    map.appendChild(
+      el("div", { className: "node store bins" }, [
+        el("b", { text: "Staff bins" }),
+        el("div", { className: "bins-row" }, [
+          el("span", { className: "bin", text: "Report" }),
+          el("span", { className: "bin", text: "Do" }),
+          el("span", { className: "bin", text: "Edit" }),
+        ]),
+      ])
+    );
+    map.appendChild(
+      el("div", { className: "node store bob" }, [el("b", { text: "Bob-only vault" }), el("small", { text: "Not staff" })])
+    );
+
+    var liveBtn = el("button", {
+      className: "node live" + (live ? "" : " empty") + (holding && holding.status !== "removed" ? " drop" : ""),
+      type: "button",
+      onClick: function (event) {
+        event.stopPropagation();
+        if (holding && holding.id !== (live && live.id)) seatLive();
+        else if (live) {
+          heldId = live.id;
+          draw();
+        }
+      },
+    });
+    if (live) {
+      liveBtn.appendChild(el("span", { className: "tag", text: live.example ? "Live · Example" : "Live block" }));
+      liveBtn.appendChild(el("span", { className: "name", text: labelOf(live) }));
+      liveBtn.appendChild(el("span", { className: "yes", text: yesOf(live) }));
+    } else {
+      liveBtn.appendChild(el("span", { className: "tag", text: "Empty socket" }));
+      liveBtn.appendChild(el("span", { className: "name", text: "Seat a token" }));
+      liveBtn.appendChild(el("span", { className: "yes", text: "Pick one from Hold" }));
+    }
+    map.appendChild(liveBtn);
+
+    if (mintOpen) {
+      var card = el("form", {
+        className: "mint-card",
+        onSubmit: function (event) {
+          event.preventDefault();
+          var result = Board.addBottleneck(board, draft);
+          if (!result.ok) {
+            formError = result.error;
+            draw();
+            return;
+          }
+          board = result.board;
+          heldId = result.id;
+          mintOpen = false;
+          formError = "";
+          draft = { stuck: "", why: "", unstick: "" };
+          persist();
+          draw();
+        },
+        onClick: function (event) {
+          event.stopPropagation();
+        },
+      });
+      card.appendChild(el("h2", { text: "Mint a token" }));
+      ["stuck", "why", "unstick"].forEach(function (name) {
+        var input = el("input", {
+          name: name,
+          required: true,
+          placeholder: name === "stuck" ? "What is stuck" : name === "why" ? "Why" : "Yes or act that unsticks it",
+        });
+        input.value = draft[name];
+        input.addEventListener("input", function () {
+          draft[name] = input.value;
+        });
+        card.appendChild(input);
+      });
+      card.appendChild(el("p", { className: "err", text: formError }));
+      card.appendChild(
+        el("div", { className: "row" }, [
+          el("button", { type: "submit", text: "Drop onto the map" }),
+          el("button", {
+            className: "ghost",
+            type: "button",
+            text: "Cancel",
+            onClick: function () {
+              mintOpen = false;
+              draw();
+            },
+          }),
+        ])
       );
+      map.appendChild(el("div", { className: "overlay" }, [card]));
     }
 
-    var hud = el("div", { className: "hud" }, [
-      el("i", { className: "hud-lamp" + (live ? " on" : ""), "aria-hidden": "true" }),
-      el("strong", { text: live ? "Live constraint" : "No live constraint" }),
-      el("span", { text: live ? live.stuck : "Name the stuck thing. The ship waits." }),
-    ]);
+    var caused = el("aside", { className: "rail caused" }, [el("div", { className: "rail-title", text: "Caused" })]);
+    var bay = el("div", {
+      className: "drop-bay" + (holding ? " hot" : ""),
+      onClick: function (event) {
+        event.stopPropagation();
+        sendCaused();
+      },
+    });
+    if (!removed.length) {
+      bay.appendChild(el("div", { className: "rail-title", text: holding ? "Drop here to clear" : "Empty" }));
+    }
+    caused.appendChild(bay);
+    removed.forEach(function (item) {
+      caused.appendChild(chip(item, "caused"));
+    });
 
-    root.appendChild(mast);
-    root.appendChild(hud);
-    root.appendChild(el("div", { className: "deck" }, [liveBox, staff]));
-    root.appendChild(el("div", { className: "deck", style: null }, [waitingBox, addBox]));
-    root.appendChild(removedBox);
-    root.appendChild(fine);
+    var hint = "The glowing block is the live bottleneck. Pick a token, then click the block or the Caused bay.";
+    if (holding && holding.status === "removed") {
+      hint = "Token in hand. Click the live block to put it back, or click the map to set it down.";
+    } else if (holding && live && holding.id === live.id) {
+      hint = "Live token in hand. Click Caused to mark it removed.";
+    } else if (holding) {
+      hint = "Token in hand. Click the live block to seat it, or Caused to clear it.";
+    } else if (!live) {
+      hint = "No live block. Pick a Hold token and click the empty socket.";
+    }
+
+    root.appendChild(hold);
+    root.appendChild(map);
+    root.appendChild(caused);
+    root.appendChild(el("div", { className: "hint", text: hint }));
   }
 
   draw();

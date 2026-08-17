@@ -29,6 +29,8 @@
       stuck: stuck,
       why: why,
       unstick: unstick,
+      label: String(raw.label || "").trim(),
+      yes: String(raw.yes || "").trim(),
       status: status,
       example: Boolean(raw.example),
       createdAt: raw.createdAt || nowIso(),
@@ -108,6 +110,8 @@
       stuck: fields && fields.stuck,
       why: fields && fields.why,
       unstick: fields && fields.unstick,
+      label: fields && fields.label,
+      yes: fields && fields.yes,
       status: "waiting",
       example: false,
     });
