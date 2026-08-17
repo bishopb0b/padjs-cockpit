@@ -81,7 +81,7 @@
         el("button", {
           className: "secondary",
           type: "button",
-          text: "Bring it back as live",
+          text: "Put this back as the live one",
           onClick: function () {
             var result = Board.setLive(board, item.id);
             if (result.ok) {
@@ -135,6 +135,7 @@
       el("h2", { text: "You, then staff" }),
       el("div", { className: "staff" }, [
         el("div", { className: "you", text: "You" }),
+        el("div", { className: "stem", "aria-hidden": "true" }),
         el("div", { className: "org" }, [
           el("div", { className: "staff-card" }, [
             el("b", { text: "Grok Bot CoS" }),
@@ -152,7 +153,7 @@
       ]),
       el("p", {
         className: "rule",
-        text: "Other vault paths are Bob-only. Staff sit under you. Their work belongs in one of three bins — not in your private folders.",
+        text: "Staff sit under you, never beside you. CoS may write only in vault KIP folders. Everything else in the vault is Bob-only.",
       }),
       el("div", { className: "bins" }, [
         el("div", { className: "bin" }, [
@@ -255,7 +256,14 @@
       );
     }
 
+    var hud = el("div", { className: "hud" }, [
+      el("i", { className: "hud-lamp" + (live ? " on" : ""), "aria-hidden": "true" }),
+      el("strong", { text: live ? "Live constraint" : "No live constraint" }),
+      el("span", { text: live ? live.stuck : "Name the stuck thing. The ship waits." }),
+    ]);
+
     root.appendChild(mast);
+    root.appendChild(hud);
     root.appendChild(el("div", { className: "deck" }, [liveBox, staff]));
     root.appendChild(el("div", { className: "deck", style: null }, [waitingBox, addBox]));
     root.appendChild(removedBox);
