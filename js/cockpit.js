@@ -206,7 +206,13 @@
         className: "mint-card",
         onSubmit: function (event) {
           event.preventDefault();
-          var result = Board.addBottleneck(board, draft);
+          var result = Board.addBottleneck(board, {
+            stuck: draft.stuck,
+            why: draft.why,
+            unstick: draft.unstick,
+            label: draft.stuck,
+            yes: draft.unstick,
+          });
           if (!result.ok) {
             formError = result.error;
             draw();

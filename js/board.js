@@ -3,7 +3,7 @@
  * Works in the browser and in Node tests.
  */
 (function (root) {
-  var STORAGE_KEY = "padjs-cockpit-v1";
+  var STORAGE_KEY = "padjs-cockpit-v2";
 
   function nowIso() {
     return new Date().toISOString();
