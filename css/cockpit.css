@@ -136,7 +136,7 @@ html, body, .app {
   position: absolute;
   touch-action: none;
   z-index: 1;
-  width: 248px;
+  width: 268px;
   padding: 10px 12px 10px;
   background: #121a26;
   border: 2px solid #3d4d66;

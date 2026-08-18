@@ -169,11 +169,41 @@
       });
       row.appendChild(dot);
       row.appendChild(document.createTextNode(inputName));
+      if (miss) {
+        row.appendChild(
+          el("button", {
+            className: "act",
+            type: "button",
+            text: "Exists",
+            title: "Mark this missing input as now existing",
+            onClick: function (event) {
+              event.stopPropagation();
+              apply(Graph.markInputExists(graph, task.id, inputName));
+            },
+          })
+        );
+      }
       ports.appendChild(row);
     });
     task.outputs.forEach(function (outputName) {
       var made = task.produced.indexOf(outputName) !== -1;
       var row = el("div", { className: "port out" + (made ? " ok" : "") });
+      row.appendChild(
+        el("button", {
+          className: "act go",
+          type: "button",
+          text: made ? "Unmake" : "Exists",
+          title: made ? "This output is not produced yet" : "Predecessor produced this output",
+          onClick: function (event) {
+            event.stopPropagation();
+            apply(
+              made
+                ? Graph.markUnproduced(graph, task.id, outputName)
+                : Graph.markProduced(graph, task.id, outputName)
+            );
+          },
+        })
+      );
       row.appendChild(document.createTextNode(outputName));
       var dot = el("i", {
         className: "dot",
@@ -205,57 +235,6 @@
       node.appendChild(el("p", { className: "wait", text: waitText(viewItem.missing) }));
     }
 
-    var acts = el("div", { className: "acts" });
-    task.outputs.forEach(function (outputName) {
-      var made = task.produced.indexOf(outputName) !== -1;
-      acts.appendChild(
-        el("button", {
-          className: "act go",
-          type: "button",
-          text: made ? "Unproduce " + outputName : "Predecessor produced: " + outputName,
-          onClick: function (event) {
-            event.stopPropagation();
-            apply(
-              made
-                ? Graph.markUnproduced(graph, task.id, outputName)
-                : Graph.markProduced(graph, task.id, outputName)
-            );
-          },
-        })
-      );
-    });
-    viewItem.missing.forEach(function (item) {
-      acts.appendChild(
-        el("button", {
-          className: "act",
-          type: "button",
-          text: "This input exists: " + item.input,
-          onClick: function (event) {
-            event.stopPropagation();
-            apply(Graph.markInputExists(graph, task.id, item.input));
-          },
-        })
-      );
-    });
-    if (selectedEdge) {
-      var edge = Graph.edgeById(graph, selectedEdge);
-      if (edge && (edge.fromId === task.id || edge.toId === task.id)) {
-        acts.appendChild(
-          el("button", {
-            className: "act",
-            type: "button",
-            text: "Break selected link",
-            onClick: function (event) {
-              event.stopPropagation();
-              var id = selectedEdge;
-              selectedEdge = null;
-              apply(Graph.removeEdge(graph, id));
-            },
-          })
-        );
-      }
-    }
-    node.appendChild(acts);
     return node;
   }
 
