@@ -2,7 +2,7 @@
 
 This is the first screen of a PADjs “ship of state” tool for Bob Bishop.
 
-It is a **picture** he can fly. It is not a note system, not a form, and not a bullet list.
+It is the **work graph**: construction tasks linked by inputs and outputs. It is not the staff picture. The staff picture is only a tiny legend.
 
 ## How Bob opens it
 
@@ -10,51 +10,62 @@ It is a **picture** he can fly. It is not a note system, not a form, and not a b
 2. Double-click `index.html`, or drag it onto Safari, Chrome, or Firefox.
 3. That is the whole install.
 
-The picture remembers his tokens **in that browser on that Mac**.
+The graph remembers his work **in that browser on that Mac**.
 
 ## What he sees
 
-A one-page map, like the PADjs mermaid:
+A graphic network of **construction tasks**.
 
-- **You** at the top
-- **Grok Bot CoS**, **Claude**, and **Grok CLI** under him (staff, never peers)
-- **Stores** under staff: KIP vault (CoS only), staff bins (report / do / edit), Bob-only vault
-- The **live bottleneck** as the glowing block in the channel — what is stuck, and the yes that unsticks it
+A node is a task, not a person and not a folder. It has:
 
-Hold tokens sit on the left. Caused tokens sit on the right. They are objects, not paragraphs.
+- required **inputs**
+- a **constructor** that can still do it
+- **outputs** the next task will use as inputs
 
-Rows marked **EXAMPLE** are seeds, not live mail or calendar.
+An edge is a causal link: output of A becomes input of B. Drag an output dot onto an input dot to draw a link. Click a wire, then **Break selected link** to revise it.
 
-## What a bottleneck is
+If a predecessor has not produced the input, the next task is **locked**. Locked means that constructor cannot run yet. The lock says which predecessor input is missing. That lock is a real constraint.
 
-The thing that is stuck. Until it moves, other work waits. Identifying and removing it is the knowledge-growth work.
+The glowing node is the **live bottleneck** on a path: the lock or missing input that stops the next constructor.
+
+Rows marked **EXAMPLE** are seeds so the board is not blank. They are not live KIP contents. Real KIP work loads later, when the Mac vault is readable.
 
 ## How he flies it
 
-- **Pick up a token** on the left (or the glowing block).
-- **Seat it as live** by clicking the glowing block.
-- **Mark it removed / caused** by dropping it on the Caused bay.
-- **Add one** with **+ New token**. It drops onto the map as a token, not a spreadsheet row.
+- **Drag a task** to move it.
+- **Draw a link** from an output dot to an input dot.
+- **Break a link** by clicking the wire, then Break selected link.
+- **Add a task** with **+ Task**. It needs a name, a constructor that can still do it, inputs, and outputs. That is a construction task, not a note.
+- **Mark a predecessor produced** when that output now exists. Downstream locks open.
+- **Mark “this input exists”** when the missing input is in hand. That removes that bottleneck.
 
-Only one live block at a time. The live constraint should be obvious without reading a paragraph.
+## What a bottleneck is
 
-## The example tokens
+The place a path is stuck: a missing predecessor, a missing input, or a constructor that cannot run yet. Identifying and removing those is the knowledge-growth work.
 
-- Grok Bot file work is one Mac at a time (Air vs Mini).
-- The cockpit screen did not exist (this repo is the start).
-- Tuesday Becker go/no-go still needs JointSpace funds, OPERhythm IP, and dice-study productization.
+## The example tasks
+
+These stand in for work Claude tried to signal in vault KIP folders. They are examples, not a dump of the vault.
+
+- Seat Bot file work on one Mac → Shared file home → Model the work as a construction graph.
+- Place JointSpace funds, place OPERhythm IP, and productize the dice study → Tuesday Becker go/no-go.
+
+Becker starts locked. It cannot run until those three outputs exist.
 
 ## What this is not
 
-- Not Obsidian’s graph.
-- Not a rebuild of KIP.
-- Not a full Pearl DAG or Constructor Theory engine.
-- Not a place to dump notes.
+- Not a historical timeline of what already happened.
+- Not a backlog of things Bob can think of to do.
+- Not another KIP folder tree.
+- Not the staff-framework picture as the product.
+- Not a full Pearl engine or Constructor Theory treatise.
+
+Staff still sit under Bob (You → CoS / Claude / Grok CLI). CoS writes only to vault KIP folders. That frame is the small legend, not the board.
 
 ## For someone who wants to check the logic
 
 ```
-node test/board.test.js
+node test/graph.test.js
 ```
 
 Bob does not need to run that.
