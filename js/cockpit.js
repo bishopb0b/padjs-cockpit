@@ -79,6 +79,7 @@
       var hit = document.createElementNS("http://www.w3.org/2000/svg", "path");
       hit.setAttribute("d", d);
       hit.setAttribute("class", "hit");
+      hit.style.pointerEvents = "stroke";
       hit.addEventListener("pointerdown", function (event) {
         event.stopPropagation();
         selectedEdge = edge.id;
@@ -152,8 +153,9 @@
         "data-port": task.id + ":in:" + inputName,
         title: "Drop an output here",
       });
-      dot.addEventListener("pointerup", function (event) {
+      dot.addEventListener("pointerdown", function (event) {
         event.stopPropagation();
+        event.preventDefault();
         if (!link || !link.fromId) return;
         apply(
           Graph.addEdge(graph, {
@@ -277,6 +279,17 @@
               : "Bottleneck: " + live.task.name + " can run"
             : "No live bottleneck",
         }),
+        selectedEdge
+          ? el("button", {
+              type: "button",
+              text: "Break link",
+              onClick: function () {
+                var id = selectedEdge;
+                selectedEdge = null;
+                apply(Graph.removeEdge(graph, id));
+              },
+            })
+          : null,
         el("button", {
           type: "button",
           text: "+ Task",
@@ -290,6 +303,12 @@
     );
 
     var stage = el("section", { className: "stage", id: "stage" });
+    stage.addEventListener("pointerdown", function (event) {
+      if (event.target !== stage && !event.target.classList.contains("extent")) return;
+      link = null;
+      selectedEdge = null;
+      draw();
+    });
     stage.appendChild(el("div", { className: "extent", "aria-hidden": "true" }));
     view.tasks.forEach(function (item) {
       stage.appendChild(renderTask(item, live && live.id));
@@ -353,13 +372,14 @@
     root.appendChild(stage);
     stage.appendChild(drawWires(stage, view));
 
-    var hint = "Drag a task to move it. Drag an output dot to an input dot to link. Click a wire, then Break selected link.";
+    var hint = "Drag a task to move it. Click an output dot, then click an input dot to link. Click a wire, then Break link.";
     if (live && live.locked) {
       hint = live.task.name + " cannot run yet. " + waitText(live.missing);
     } else if (live) {
       hint = live.task.name + " is the live bottleneck: the constructor can run. Mark its output produced when the input exists.";
     }
-    if (selectedEdge) hint = "Link selected. Break it from a connected task, or click the map to keep it.";
+    if (link && link.fromId) hint = "Linking “" + link.fromOutput + "”. Click an input dot, or click the map to cancel.";
+    if (selectedEdge) hint = "Link selected. Press Break link in the top bar, or click the map to keep it.";
     root.appendChild(el("div", { className: "hint", text: hint }));
   }
 
@@ -397,17 +417,12 @@
     redrawWires();
   });
 
-  window.addEventListener("pointerup", function (event) {
+  window.addEventListener("pointerup", function () {
     if (drag) {
       persist();
       drag = null;
-      draw();
-      return;
-    }
-    if (!link) return;
-    if (!event.target.closest || !event.target.closest(".dot")) {
-      link = null;
-      draw();
+      var node = document.querySelector(".task.dragging");
+      if (node) node.classList.remove("dragging");
     }
   });
 
