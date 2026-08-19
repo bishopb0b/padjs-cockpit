@@ -1,6 +1,7 @@
 (function () {
   var Graph = window.PadjsGraph;
   var SEED = window.PadjsSeed;
+  var SAFE = window.PadjsFiresafe;
   var graph = Graph.load(null, SEED);
   var selectedEdge = null;
   var mintOpen = false;
@@ -292,6 +293,34 @@
     view.tasks.forEach(function (item) {
       stage.appendChild(renderTask(item, live && live.id));
     });
+    var safe = el("aside", { className: "safe", onPointerDown: function (event) { event.stopPropagation(); } });
+    safe.appendChild(el("div", { className: "safe-latch", "aria-hidden": "true" }));
+    safe.appendChild(el("h2", { text: "Fire safe" }));
+    var now = el("div", { className: "safe-bay in" }, [el("div", { className: "safe-kicker", text: "In now" })]);
+    SAFE.inNow.forEach(function (item) {
+      now.appendChild(el("div", { className: "safe-item checked", text: item }));
+    });
+    safe.appendChild(now);
+    safe.appendChild(
+      el("div", { className: "safe-bay next" }, [
+        el("div", { className: "safe-kicker", text: "Next print" }),
+        el("div", { className: "safe-ticket", text: SAFE.nextPrint.name }),
+        el("div", { className: "safe-ticket-sub", text: SAFE.nextPrint.contains }),
+      ])
+    );
+    safe.appendChild(
+      el("div", { className: "owners" }, [
+        el("div", { className: "owner robs" }, [
+          el("b", { text: "ROBS" }),
+          el("span", { text: SAFE.owners.robs }),
+        ]),
+        el("div", { className: "owner taxes" }, [
+          el("b", { text: "Taxes" }),
+          el("span", { text: SAFE.owners.taxes }),
+        ]),
+      ])
+    );
+    stage.appendChild(safe);
     stage.appendChild(
       el("div", { className: "legend" }, [
         el("b", { text: "Frame, not the work" }),

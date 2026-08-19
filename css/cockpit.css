@@ -253,6 +253,103 @@ html, body, .app {
   color: var(--ok);
 }
 
+.safe {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 2;
+  width: 248px;
+  padding: 14px 14px 12px 18px;
+  background:
+    linear-gradient(180deg, #2a2218 0%, #16110c 70%);
+  border: 2px solid #8a6a32;
+  box-shadow: inset 0 0 0 1px #3d2e16, 0 10px 28px rgba(0, 0, 0, 0.45);
+  color: #f3e6c8;
+}
+
+.safe-latch {
+  position: absolute;
+  left: -7px;
+  top: 28px;
+  width: 12px;
+  height: 36px;
+  background: #c9a24a;
+  border-radius: 2px;
+  box-shadow: 0 0 8px rgba(255, 176, 32, 0.35);
+}
+
+.safe h2 {
+  margin: 0 0 10px;
+  font-family: var(--serif);
+  font-size: 20px;
+  letter-spacing: 0.04em;
+}
+
+.safe-kicker {
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #c9b896;
+  margin-bottom: 4px;
+}
+
+.safe-bay {
+  margin-bottom: 10px;
+}
+
+.safe-item {
+  font-size: 13px;
+  line-height: 1.35;
+  padding-left: 16px;
+  position: relative;
+}
+
+.safe-item.checked::before {
+  content: "✓";
+  position: absolute;
+  left: 0;
+  color: var(--ok);
+  font-weight: 700;
+}
+
+.safe-ticket {
+  font-family: var(--serif);
+  font-size: 16px;
+  line-height: 1.15;
+  color: var(--live);
+}
+
+.safe-ticket-sub {
+  margin-top: 3px;
+  font-size: 12px;
+  color: #d7c27a;
+}
+
+.owners {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  padding-top: 8px;
+  border-top: 1px solid #3d2e16;
+}
+
+.owner {
+  padding: 5px 6px;
+  background: #100c08;
+  border: 1px solid #3d2e16;
+  font-size: 10px;
+  line-height: 1.3;
+  color: #c8c0ae;
+}
+
+.owner b {
+  display: block;
+  margin-bottom: 2px;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  color: #efe4c8;
+}
+
 .legend {
   position: absolute;
   left: 12px;

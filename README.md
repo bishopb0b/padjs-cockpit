@@ -52,6 +52,20 @@ These stand in for work Claude tried to signal in vault KIP folders. They are ex
 
 Becker starts locked. It cannot run until those three outputs exist.
 
+## The fire-safe card
+
+One steel card on the graph. It is how Bob finds fire-safe paper. It is not a Taxes chat list and not a filing cabinet.
+
+- **In now (checked):** LiquidETH stock certificates 1–4; minutes.
+- **Next print (one packet):** 2025 personal forms (W-2, 1099s, SSA-1099) and the 2024 joint return.
+
+Later packets stay off this glance.
+
+Small ownership stamp on that card:
+
+- **ROBS** owns Carly / Form 5500 / Plan Sponsor Link / Benetrends year-end.
+- **Taxes** owns 1040, MI-1040, 1120, Xero, Gusto 6765.
+
 ## What this is not
 
 - Not a historical timeline of what already happened.
@@ -66,6 +80,7 @@ Staff still sit under Bob (You → CoS / Claude / Grok CLI). CoS writes only to 
 
 ```
 node test/graph.test.js
+node test/firesafe.test.js
 ```
 
 Bob does not need to run that.
