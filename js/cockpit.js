@@ -5,7 +5,6 @@
   var graph = Graph.load(null, SEED);
   var selectedEdge = null;
   var mintOpen = false;
-  var formError = "";
   var draft = { name: "", constructor: "", inputs: "", outputs: "" };
   var drag = null;
   var link = null;
@@ -260,14 +259,12 @@
           event.preventDefault();
           var result = Graph.addTask(graph, draft, { x: 80 + graph.tasks.length * 12, y: 80 + graph.tasks.length * 12 });
           if (!result.ok) {
-            formError = result.error;
             draw();
             return;
           }
           graph = result.graph;
           mintOpen = false;
           draft = { name: "", constructor: "", inputs: "", outputs: "" };
-          formError = "";
           persist();
           draw();
         },
