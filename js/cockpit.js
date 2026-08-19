@@ -2,12 +2,15 @@
   var Graph = window.PadjsGraph;
   var SEED = window.PadjsSeed;
   var SAFE = window.PadjsFiresafe;
+  var Signal = window.PadjsSignal;
   var graph = Graph.load(null, SEED);
   var selectedEdge = null;
   var mintOpen = false;
   var draft = { name: "", constructor: "", inputs: "", outputs: "" };
   var drag = null;
   var link = null;
+  var pinSay = null;
+  var sayEl = document.getElementById("say");
 
   function el(tag, attrs, children) {
     var node = document.createElement(tag);
@@ -27,6 +30,58 @@
 
   function persist() {
     Graph.save(graph);
+  }
+
+  function hideSay() {
+    if (!sayEl) return;
+    sayEl.hidden = true;
+    sayEl.textContent = "";
+    pinSay = null;
+  }
+
+  function fillSay(text) {
+    sayEl.textContent = "";
+    if (text.a) {
+      var one = document.createElement("div");
+      one.textContent = text.a;
+      sayEl.appendChild(one);
+    }
+    if (text.b) {
+      var two = document.createElement("div");
+      two.className = "say2";
+      two.textContent = text.b;
+      sayEl.appendChild(two);
+    }
+  }
+
+  function placeSay(x, y) {
+    sayEl.hidden = false;
+    var maxX = window.innerWidth - 256;
+    var maxY = window.innerHeight - 80;
+    sayEl.style.left = Math.max(8, Math.min(x + 14, maxX)) + "px";
+    sayEl.style.top = Math.max(8, Math.min(y + 14, maxY)) + "px";
+  }
+
+  function sayHost(el) {
+    return el && el.closest ? el.closest("[data-saya], [data-say]") : null;
+  }
+
+  function sayFrom(el) {
+    var host = sayHost(el);
+    if (!host) return null;
+    return {
+      a: host.getAttribute("data-saya") || host.getAttribute("data-say") || "",
+      b: host.getAttribute("data-sayb") || "",
+    };
+  }
+
+  function showSay(el, x, y, pin) {
+    if ((drag && drag.moved) || link || !sayEl) return;
+    var text = sayFrom(el);
+    if (!text || (!text.a && !text.b)) return;
+    fillSay(text);
+    placeSay(x, y);
+    if (pin) pinSay = sayHost(el);
   }
 
   function apply(result) {
@@ -112,14 +167,27 @@
       style: "left:" + task.x + "px;top:" + task.y + "px",
       "data-id": task.id,
     });
+    var say = Signal.taskSay(viewItem, liveId === task.id);
+    node.setAttribute("data-saya", say.a);
+    if (say.b) node.setAttribute("data-sayb", say.b);
+
     node.addEventListener("pointerdown", function (event) {
       if (event.target.closest(".dot, .sq") || mintOpen) return;
-      drag = { id: task.id, dx: event.clientX - task.x, dy: event.clientY - task.y };
-      node.classList.add("dragging");
+      drag = {
+        id: task.id,
+        dx: event.clientX - task.x,
+        dy: event.clientY - task.y,
+        x0: event.clientX,
+        y0: event.clientY,
+        moved: false,
+      };
     });
 
-    if (viewItem.locked) node.appendChild(el("span", { className: "lock", text: "🔒" }));
-    else node.appendChild(el("span", { className: "lock", text: "" }));
+    if (viewItem.locked) {
+      node.appendChild(
+        el("span", { className: "lock bolt", "data-say": Signal.lockSay().a })
+      );
+    }
     node.appendChild(el("b", { className: "sigil", text: task.mark || task.name }));
 
     var ports = el("div", { className: "ports" });
@@ -127,7 +195,12 @@
     task.inputs.forEach(function (inputName) {
       var miss = viewItem.missing.find(function (item) { return item.input === inputName; });
       var row = el("div", { className: "port in" + (miss ? "" : " ok") });
-      var dot = el("i", { className: "dot", "data-port": task.id + ":in:" + inputName });
+      var waiting = Signal.inputSay(inputName, !miss);
+      var dot = el("i", {
+        className: "dot",
+        "data-port": task.id + ":in:" + inputName,
+        "data-say": waiting.a,
+      });
       dot.addEventListener("pointerdown", function (event) {
         event.stopPropagation();
         event.preventDefault();
@@ -152,10 +225,12 @@
     task.outputs.forEach(function (outputName) {
       var made = task.produced.indexOf(outputName) !== -1;
       var row = el("div", { className: "port out" + (made ? " ok" : "") });
+      var exists = Signal.outputSay(outputName, made);
       row.appendChild(
         el("button", {
           className: "sq" + (made ? " on" : ""),
           type: "button",
+          "data-say": exists.a,
           onClick: function (event) {
             event.stopPropagation();
             apply(
@@ -166,9 +241,14 @@
           },
         })
       );
-      var dot = el("i", { className: "dot", "data-port": task.id + ":out:" + outputName });
+      var dot = el("i", {
+        className: "dot",
+        "data-port": task.id + ":out:" + outputName,
+        "data-say": exists.a,
+      });
       dot.addEventListener("pointerdown", function (event) {
         event.stopPropagation();
+        hideSay();
         var stage = document.getElementById("stage");
         var box = stage.getBoundingClientRect();
         link = {
@@ -193,6 +273,7 @@
   }
 
   function draw() {
+    hideSay();
     var root = document.getElementById("app");
     root.className = "app";
     var view = Graph.inspect(graph);
@@ -202,10 +283,15 @@
     var lampClass = "lamp";
     if (live && live.locked) lampClass += " lock";
     else if (live) lampClass += " on";
+    var lampText = Signal.liveSay(live);
 
     root.appendChild(
       el("div", { className: "hud" }, [
-        el("i", { className: lampClass }),
+        el("i", {
+          className: lampClass,
+          "data-saya": lampText.a,
+          "data-sayb": lampText.b,
+        }),
         el("span", { className: "spacer" }),
         selectedEdge
           ? el("button", {
@@ -245,10 +331,25 @@
     var safe = el("aside", { className: "safe", onPointerDown: function (event) { event.stopPropagation(); } });
     safe.appendChild(el("div", { className: "safe-latch", "aria-hidden": "true" }));
     var marks = el("div", { className: "safe-marks" });
-    SAFE.inNow.forEach(function () {
-      marks.appendChild(el("div", { className: "tick", text: "✓" }));
+    var inBox = el("div", { className: "safe-in" });
+    SAFE.inNow.forEach(function (name) {
+      var inText = Signal.safeInSay(name);
+      inBox.appendChild(
+        el("div", {
+          className: Signal.safeKind(name),
+          "data-saya": inText.a,
+        })
+      );
     });
-    marks.appendChild(el("div", { className: "print", title: SAFE.nextPrint.name }));
+    var nextText = Signal.nextPrintSay(SAFE.nextPrint);
+    marks.appendChild(inBox);
+    marks.appendChild(
+      el("div", {
+        className: "print",
+        "data-saya": nextText.a,
+        "data-sayb": nextText.b,
+      })
+    );
     safe.appendChild(marks);
     stage.appendChild(safe);
 
@@ -311,8 +412,41 @@
     stage.appendChild(drawWires(stage, Graph.inspect(graph)));
   }
 
+  document.addEventListener("pointerover", function (event) {
+    if (pinSay || (drag && drag.moved) || link) return;
+    var host = sayHost(event.target);
+    if (host) showSay(host, event.clientX, event.clientY, false);
+  });
+
+  document.addEventListener("pointerout", function (event) {
+    if (pinSay || (drag && drag.moved) || link) return;
+    var from = sayHost(event.target);
+    if (!from) return;
+    var to = event.relatedTarget;
+    if (to && sayHost(to)) return;
+    hideSay();
+  });
+
+  document.addEventListener("pointerdown", function (event) {
+    if ((drag && drag.moved) || link) return;
+    var host = sayHost(event.target);
+    var action = event.target.closest && event.target.closest(".dot, .sq, button, input, .overlay");
+    if (host && !action) {
+      showSay(host, event.clientX, event.clientY, true);
+      return;
+    }
+    if (!host) hideSay();
+  });
+
   window.addEventListener("pointermove", function (event) {
     if (drag) {
+      if (!drag.moved) {
+        if (Math.abs(event.clientX - drag.x0) + Math.abs(event.clientY - drag.y0) < 5) return;
+        drag.moved = true;
+        hideSay();
+        var grabbed = document.querySelector('.task[data-id="' + drag.id + '"]');
+        if (grabbed) grabbed.classList.add("dragging");
+      }
       var moved = Graph.moveTask(graph, drag.id, event.clientX - drag.dx, event.clientY - drag.dy);
       if (moved.ok) {
         graph = moved.graph;
@@ -339,7 +473,7 @@
 
   window.addEventListener("pointerup", function () {
     if (drag) {
-      persist();
+      if (drag.moved) persist();
       drag = null;
       var node = document.querySelector(".task.dragging");
       if (node) node.classList.remove("dragging");
