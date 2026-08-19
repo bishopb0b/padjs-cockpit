@@ -80,8 +80,9 @@ html, body, .app {
 
 .wires path {
   fill: none;
-  stroke: var(--wire);
-  stroke-width: 3;
+  stroke: #6a7d96;
+  stroke-width: 3.5;
+  stroke-linecap: round;
 }
 
 .wires path.locked {
@@ -95,14 +96,30 @@ html, body, .app {
   filter: drop-shadow(0 0 6px rgba(255, 176, 32, 0.7));
 }
 
+.wires path.rubber {
+  stroke: var(--port);
+  stroke-width: 3;
+  stroke-dasharray: 5 4;
+  filter: drop-shadow(0 0 5px rgba(158, 192, 230, 0.7));
+}
+
 .wires path.hit {
   stroke: transparent;
-  stroke-width: 18;
+  stroke-width: 20;
   pointer-events: stroke;
   cursor: pointer;
 }
 
-.wires path.selected { stroke: #fff3c4; }
+.wires path.hit:hover + path {
+  stroke: #c5d6ea;
+  stroke-width: 5;
+}
+
+.wires path.selected {
+  stroke: #fff3c4;
+  stroke-width: 5;
+  filter: drop-shadow(0 0 6px rgba(255, 243, 196, 0.7));
+}
 
 .extent {
   position: absolute;
@@ -120,10 +137,17 @@ html, body, .app {
   padding: 10px 8px 12px;
   background: #121a26;
   border: 2px solid #3d4d66;
-  cursor: grab;
+  cursor: move;
   user-select: none;
   touch-action: none;
   text-align: center;
+  box-shadow: 0 2px 0 #0a0e14;
+  transition: transform 0.08s ease, box-shadow 0.08s ease;
+}
+
+.task:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 18px rgba(0, 0, 0, 0.45);
 }
 
 .task.locked { border-color: var(--lock); background: #1a1212; }
@@ -146,7 +170,12 @@ html, body, .app {
   transform: rotate(45deg);
 }
 
-.task.dragging { cursor: grabbing; z-index: 3; }
+.task.dragging {
+  cursor: grabbing;
+  z-index: 3;
+  transform: translateY(-5px);
+  box-shadow: 0 18px 28px rgba(0, 0, 0, 0.55);
+}
 
 @keyframes pulse {
   0%, 100% { filter: brightness(1); }
@@ -155,6 +184,7 @@ html, body, .app {
 
 .sigil {
   display: block;
+  position: relative;
   font-size: 18px;
   letter-spacing: 0.02em;
 }
@@ -203,21 +233,43 @@ html, body, .app {
 
 .stack.out { align-items: flex-end; }
 
+.port { position: relative; }
+
 .dot {
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
   border-radius: 50%;
   border: 2px solid var(--port);
-  background: #0e121a;
-  cursor: crosshair;
+  background:
+    radial-gradient(circle at 50% 45%, #0a0e14 36%, #1c2838 40%, #0e121a 72%);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.65), 0 0 0 2px #0a1018;
+  cursor: grab;
   touch-action: none;
   display: block;
+  position: relative;
 }
 
-.port.in .dot { border-color: var(--lock); border-right-color: transparent; }
-.port.in.ok .dot { border-color: var(--ok); background: var(--ok); }
-.port.out .dot { border-color: var(--port); }
-.port.out.ok .dot { border-color: var(--ok); background: var(--ok); }
+.port.in .dot {
+  border-color: var(--lock);
+  border-left-color: transparent;
+  border-radius: 6px 50% 50% 6px;
+  cursor: copy;
+}
+
+.port.in.ok .dot {
+  border-color: var(--ok);
+  border-left-color: transparent;
+  background: var(--ok);
+}
+
+.port.out .dot { cursor: grab; }
+.port.out .dot:active { cursor: grabbing; }
+.port.out.ok .dot { border-color: var(--ok); }
+
+.stage.linking .port.in .dot {
+  box-shadow: 0 0 10px var(--port), inset 0 1px 3px rgba(0, 0, 0, 0.65);
+  transform: scale(1.15);
+}
 
 .sq {
   width: 12px;
@@ -325,6 +377,71 @@ html, body, .app {
   margin-top: 3px;
   color: #c9b896;
   font-size: 12px;
+}
+
+.ghost {
+  position: absolute;
+  pointer-events: none;
+  opacity: 0.32;
+  z-index: 4;
+}
+
+.ghost.drag {
+  left: 7px;
+  top: 7px;
+  width: 14px;
+  height: 14px;
+}
+
+.ghost.drag::before,
+.ghost.drag::after {
+  content: "";
+  position: absolute;
+  background: #8ea0b8;
+}
+
+.ghost.drag::before {
+  left: 6px;
+  top: 0;
+  width: 2px;
+  height: 14px;
+}
+
+.ghost.drag::after {
+  top: 6px;
+  left: 0;
+  width: 14px;
+  height: 2px;
+}
+
+.ghost.wire {
+  left: 22px;
+  top: 8px;
+  width: 34px;
+  height: 2px;
+  background: repeating-linear-gradient(
+    90deg,
+    #8ea0b8 0 5px,
+    transparent 5px 9px
+  );
+}
+
+.ghost.hover {
+  right: -10px;
+  top: -12px;
+  width: 26px;
+  height: 14px;
+  border: 1px solid #7a6a42;
+  background: #1a140c;
+}
+
+.ghost.hover::after {
+  content: "";
+  position: absolute;
+  left: 5px;
+  bottom: -5px;
+  border: 4px solid transparent;
+  border-top-color: #7a6a42;
 }
 
 .overlay {

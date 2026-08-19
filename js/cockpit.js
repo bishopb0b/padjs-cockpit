@@ -3,7 +3,9 @@
   var SEED = window.PadjsSeed;
   var SAFE = window.PadjsFiresafe;
   var Signal = window.PadjsSignal;
+  var Seen = window.PadjsSeen;
   var graph = Graph.load(null, SEED);
+  var seen = Seen.load();
   var selectedEdge = null;
   var mintOpen = false;
   var draft = { name: "", constructor: "", inputs: "", outputs: "" };
@@ -30,6 +32,14 @@
 
   function persist() {
     Graph.save(graph);
+  }
+
+  function noteSeen(kind) {
+    var next = Seen.mark(seen, kind);
+    if (!next.changed) return;
+    seen = next.seen;
+    var ghost = document.querySelector(".ghost." + kind);
+    if (ghost) ghost.remove();
   }
 
   function hideSay() {
@@ -82,6 +92,7 @@
     fillSay(text);
     placeSay(x, y);
     if (pin) pinSay = sayHost(el);
+    noteSeen("hover");
   }
 
   function apply(result) {
@@ -151,7 +162,7 @@
     if (link && link.from && link.to) {
       var rubber = document.createElementNS("http://www.w3.org/2000/svg", "path");
       rubber.setAttribute("d", curve(link.from, link.to));
-      rubber.setAttribute("class", "live");
+      rubber.setAttribute("class", "rubber");
       svg.appendChild(rubber);
     }
     return svg;
@@ -205,15 +216,20 @@
         event.stopPropagation();
         event.preventDefault();
         if (link && link.fromId) {
+          var fromId = link.fromId;
+          var fromOutput = link.fromOutput;
+          link = null;
+          var stageNow = document.getElementById("stage");
+          if (stageNow) stageNow.classList.remove("linking");
+          noteSeen("wire");
           apply(
             Graph.addEdge(graph, {
-              fromId: link.fromId,
-              fromOutput: link.fromOutput,
+              fromId: fromId,
+              fromOutput: fromOutput,
               toId: task.id,
               toInput: inputName,
             })
           );
-          link = null;
           return;
         }
         if (miss) apply(Graph.markInputExists(graph, task.id, inputName));
@@ -248,20 +264,28 @@
       });
       dot.addEventListener("pointerdown", function (event) {
         event.stopPropagation();
+        event.preventDefault();
         hideSay();
         var stage = document.getElementById("stage");
         var box = stage.getBoundingClientRect();
+        var from = portCenter(task.id, "out", outputName);
         link = {
           fromId: task.id,
           fromOutput: outputName,
-          from: portCenter(task.id, "out", outputName),
+          from: from,
           to: {
             x: event.clientX - box.left + stage.scrollLeft,
             y: event.clientY - box.top + stage.scrollTop,
           },
         };
         selectedEdge = null;
-        draw();
+        var cut = document.querySelector(".hud .cut");
+        if (cut) cut.remove();
+        stage.classList.add("linking");
+        if (dot.setPointerCapture) {
+          try { dot.setPointerCapture(event.pointerId); } catch (err) {}
+        }
+        redrawWires();
       });
       row.appendChild(dot);
       outs.appendChild(row);
@@ -327,6 +351,18 @@
     view.tasks.forEach(function (item) {
       stage.appendChild(renderTask(item, live && live.id));
     });
+    if (!seen.drag) {
+      var grabHost = stage.querySelector(".task");
+      if (grabHost) grabHost.appendChild(el("span", { className: "ghost drag", "aria-hidden": "true" }));
+    }
+    if (!seen.wire) {
+      var pullHost = stage.querySelector(".port.out");
+      if (pullHost) pullHost.appendChild(el("span", { className: "ghost wire", "aria-hidden": "true" }));
+    }
+    if (!seen.hover) {
+      var peekHost = stage.querySelector(".task .sigil");
+      if (peekHost) peekHost.appendChild(el("span", { className: "ghost hover", "aria-hidden": "true" }));
+    }
 
     var safe = el("aside", { className: "safe", onPointerDown: function (event) { event.stopPropagation(); } });
     safe.appendChild(el("div", { className: "safe-latch", "aria-hidden": "true" }));
@@ -404,6 +440,44 @@
     stage.appendChild(drawWires(stage, view));
   }
 
+  function portSpec(node) {
+    if (!node || !node.getAttribute) return null;
+    var raw = node.getAttribute("data-port");
+    if (!raw) return null;
+    var parts = raw.split(":");
+    if (parts.length < 3) return null;
+    return { id: parts[0], kind: parts[1], name: parts.slice(2).join(":") };
+  }
+
+  function dropLink(event) {
+    if (!link) return;
+    var under = document.elementFromPoint(event.clientX, event.clientY);
+    var host = under && under.closest ? under.closest("[data-port]") : null;
+    if (!host && under && under.closest) {
+      var row = under.closest(".port.in");
+      if (row) host = row.querySelector("[data-port]");
+    }
+    var spec = portSpec(host);
+    var fromId = link.fromId;
+    var fromOutput = link.fromOutput;
+    link = null;
+    var stage = document.getElementById("stage");
+    if (stage) stage.classList.remove("linking");
+    if (spec && spec.kind === "in" && spec.id !== fromId) {
+      noteSeen("wire");
+      apply(
+        Graph.addEdge(graph, {
+          fromId: fromId,
+          fromOutput: fromOutput,
+          toId: spec.id,
+          toInput: spec.name,
+        })
+      );
+      return;
+    }
+    redrawWires();
+  }
+
   function redrawWires() {
     var stage = document.getElementById("stage");
     if (!stage) return;
@@ -471,13 +545,17 @@
     redrawWires();
   });
 
-  window.addEventListener("pointerup", function () {
+  window.addEventListener("pointerup", function (event) {
     if (drag) {
-      if (drag.moved) persist();
+      if (drag.moved) {
+        persist();
+        noteSeen("drag");
+      }
       drag = null;
       var node = document.querySelector(".task.dragging");
       if (node) node.classList.remove("dragging");
     }
+    if (link) dropLink(event);
   });
 
   draw();
