@@ -44,6 +44,7 @@
     return {
       id: String(raw.id || newId("task")),
       name: name,
+      mark: String(raw.mark || "").trim() || name.split(/\s+/)[0],
       constructor: constructor,
       inputs: inputs,
       outputs: outputs,

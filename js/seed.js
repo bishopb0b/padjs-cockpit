@@ -9,6 +9,7 @@
       {
         id: "ex-mac-home",
         example: true,
+        mark: "Mac",
         name: "Seat Bot file work on one Mac",
         constructor: "Bob can still pick Air or Mini as home",
         inputs: [],
@@ -20,6 +21,7 @@
       {
         id: "ex-work-graph",
         example: true,
+        mark: "Graph",
         name: "Model the work as a construction graph",
         constructor: "This page can still do it",
         inputs: ["Shared file home"],
@@ -31,6 +33,7 @@
       {
         id: "ex-funds",
         example: true,
+        mark: "Funds",
         name: "Place JointSpace funds",
         constructor: "Bob can still place the funds",
         inputs: [],
@@ -42,6 +45,7 @@
       {
         id: "ex-ip",
         example: true,
+        mark: "IP",
         name: "Place OPERhythm IP",
         constructor: "Bob can still place the IP",
         inputs: [],
@@ -53,6 +57,7 @@
       {
         id: "ex-dice",
         example: true,
+        mark: "Dice",
         name: "Productize the dice study",
         constructor: "Bob can still productize it",
         inputs: [],
@@ -64,6 +69,7 @@
       {
         id: "ex-becker",
         example: true,
+        mark: "Becker",
         name: "Tuesday Becker go/no-go",
         constructor: "Bob can still decide, once the inputs exist",
         inputs: ["JointSpace funds", "OPERhythm IP", "Dice-study product"],

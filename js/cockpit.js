@@ -32,12 +32,10 @@
 
   function apply(result) {
     if (!result.ok) {
-      formError = result.error || "";
       draw();
       return;
     }
     graph = result.graph;
-    formError = "";
     persist();
     draw();
   }
@@ -105,16 +103,6 @@
     return svg;
   }
 
-  function waitText(missing) {
-    if (!missing.length) return "";
-    return missing
-      .map(function (item) {
-        if (item.hasPredecessor) return "Locked: waiting on “" + item.fromOutput + "” from “" + item.fromName + "”.";
-        return "Locked: missing input “" + item.input + "” — no predecessor yet.";
-      })
-      .join(" ");
-  }
-
   function renderTask(viewItem, liveId) {
     var task = viewItem.task;
     var node = el("article", {
@@ -126,75 +114,49 @@
       "data-id": task.id,
     });
     node.addEventListener("pointerdown", function (event) {
-      if (event.target.closest(".dot, .act") || mintOpen) return;
-      drag = {
-        id: task.id,
-        dx: event.clientX - task.x,
-        dy: event.clientY - task.y,
-      };
+      if (event.target.closest(".dot, .sq") || mintOpen) return;
+      drag = { id: task.id, dx: event.clientX - task.x, dy: event.clientY - task.y };
       node.classList.add("dragging");
     });
 
-    var tags = el("div", { className: "tags" });
-    if (task.example) tags.appendChild(el("span", { className: "tag example", text: "Example" }));
-    if (liveId === task.id) tags.appendChild(el("span", { className: "tag live", text: "Live bottleneck" }));
-    if (viewItem.locked) tags.appendChild(el("span", { className: "tag lock", text: "Locked" }));
-    else if (viewItem.done) tags.appendChild(el("span", { className: "tag done", text: "Produced" }));
-    else tags.appendChild(el("span", { className: "tag ready", text: "Constructor can run" }));
-    node.appendChild(tags);
-    node.appendChild(el("h3", { text: task.name }));
-    node.appendChild(el("p", { className: "ctor", text: "Constructor: " + task.constructor }));
+    if (viewItem.locked) node.appendChild(el("span", { className: "lock", text: "🔒" }));
+    else node.appendChild(el("span", { className: "lock", text: "" }));
+    node.appendChild(el("b", { className: "sigil", text: task.mark || task.name }));
 
     var ports = el("div", { className: "ports" });
+    var ins = el("div", { className: "stack in" });
     task.inputs.forEach(function (inputName) {
       var miss = viewItem.missing.find(function (item) { return item.input === inputName; });
       var row = el("div", { className: "port in" + (miss ? "" : " ok") });
-      var dot = el("i", {
-        className: "dot",
-        "data-port": task.id + ":in:" + inputName,
-        title: "Drop an output here",
-      });
+      var dot = el("i", { className: "dot", "data-port": task.id + ":in:" + inputName });
       dot.addEventListener("pointerdown", function (event) {
         event.stopPropagation();
         event.preventDefault();
-        if (!link || !link.fromId) return;
-        apply(
-          Graph.addEdge(graph, {
-            fromId: link.fromId,
-            fromOutput: link.fromOutput,
-            toId: task.id,
-            toInput: inputName,
-          })
-        );
-        link = null;
+        if (link && link.fromId) {
+          apply(
+            Graph.addEdge(graph, {
+              fromId: link.fromId,
+              fromOutput: link.fromOutput,
+              toId: task.id,
+              toInput: inputName,
+            })
+          );
+          link = null;
+          return;
+        }
+        if (miss) apply(Graph.markInputExists(graph, task.id, inputName));
       });
       row.appendChild(dot);
-      row.appendChild(document.createTextNode(inputName));
-      if (miss) {
-        row.appendChild(
-          el("button", {
-            className: "act",
-            type: "button",
-            text: "Exists",
-            title: "Mark this missing input as now existing",
-            onClick: function (event) {
-              event.stopPropagation();
-              apply(Graph.markInputExists(graph, task.id, inputName));
-            },
-          })
-        );
-      }
-      ports.appendChild(row);
+      ins.appendChild(row);
     });
+    var outs = el("div", { className: "stack out" });
     task.outputs.forEach(function (outputName) {
       var made = task.produced.indexOf(outputName) !== -1;
       var row = el("div", { className: "port out" + (made ? " ok" : "") });
       row.appendChild(
         el("button", {
-          className: "act go",
+          className: "sq" + (made ? " on" : ""),
           type: "button",
-          text: made ? "Unmake" : "Exists",
-          title: made ? "This output is not produced yet" : "Predecessor produced this output",
           onClick: function (event) {
             event.stopPropagation();
             apply(
@@ -205,12 +167,7 @@
           },
         })
       );
-      row.appendChild(document.createTextNode(outputName));
-      var dot = el("i", {
-        className: "dot",
-        "data-port": task.id + ":out:" + outputName,
-        title: "Drag to an input",
-      });
+      var dot = el("i", { className: "dot", "data-port": task.id + ":out:" + outputName });
       dot.addEventListener("pointerdown", function (event) {
         event.stopPropagation();
         var stage = document.getElementById("stage");
@@ -228,14 +185,11 @@
         draw();
       });
       row.appendChild(dot);
-      ports.appendChild(row);
+      outs.appendChild(row);
     });
+    ports.appendChild(ins);
+    ports.appendChild(outs);
     node.appendChild(ports);
-
-    if (viewItem.locked) {
-      node.appendChild(el("p", { className: "wait", text: waitText(viewItem.missing) }));
-    }
-
     return node;
   }
 
@@ -246,23 +200,19 @@
     var live = view.live;
     root.replaceChildren();
 
+    var lampClass = "lamp";
+    if (live && live.locked) lampClass += " lock";
+    else if (live) lampClass += " on";
+
     root.appendChild(
       el("div", { className: "hud" }, [
-        el("b", { text: "PADjs" }),
-        el("span", { text: "Work graph" }),
-        el("span", { text: "Task · input · output · lock" }),
-        el("span", {
-          className: "live-readout",
-          text: live
-            ? live.locked
-              ? "Bottleneck: " + live.task.name + " is locked"
-              : "Bottleneck: " + live.task.name + " can run"
-            : "No live bottleneck",
-        }),
+        el("i", { className: lampClass }),
+        el("span", { className: "spacer" }),
         selectedEdge
           ? el("button", {
+              className: "cut",
               type: "button",
-              text: "Break link",
+              text: "✂",
               onClick: function () {
                 var id = selectedEdge;
                 selectedEdge = null;
@@ -272,10 +222,9 @@
           : null,
         el("button", {
           type: "button",
-          text: "+ Task",
+          text: "+",
           onClick: function () {
             mintOpen = true;
-            formError = "";
             draw();
           },
         }),
@@ -293,40 +242,17 @@
     view.tasks.forEach(function (item) {
       stage.appendChild(renderTask(item, live && live.id));
     });
+
     var safe = el("aside", { className: "safe", onPointerDown: function (event) { event.stopPropagation(); } });
     safe.appendChild(el("div", { className: "safe-latch", "aria-hidden": "true" }));
-    safe.appendChild(el("h2", { text: "Fire safe" }));
-    var now = el("div", { className: "safe-bay in" }, [el("div", { className: "safe-kicker", text: "In now" })]);
-    SAFE.inNow.forEach(function (item) {
-      now.appendChild(el("div", { className: "safe-item checked", text: item }));
+    var marks = el("div", { className: "safe-marks" });
+    SAFE.inNow.forEach(function () {
+      marks.appendChild(el("div", { className: "tick", text: "✓" }));
     });
-    safe.appendChild(now);
-    safe.appendChild(
-      el("div", { className: "safe-bay next" }, [
-        el("div", { className: "safe-kicker", text: "Next print" }),
-        el("div", { className: "safe-ticket", text: SAFE.nextPrint.name }),
-        el("div", { className: "safe-ticket-sub", text: SAFE.nextPrint.contains }),
-      ])
-    );
-    safe.appendChild(
-      el("div", { className: "owners" }, [
-        el("div", { className: "owner robs" }, [
-          el("b", { text: "ROBS" }),
-          el("span", { text: SAFE.owners.robs }),
-        ]),
-        el("div", { className: "owner taxes" }, [
-          el("b", { text: "Taxes" }),
-          el("span", { text: SAFE.owners.taxes }),
-        ]),
-      ])
-    );
+    marks.appendChild(el("div", { className: "print", title: SAFE.nextPrint.name }));
+    safe.appendChild(marks);
     stage.appendChild(safe);
-    stage.appendChild(
-      el("div", { className: "legend" }, [
-        el("b", { text: "Frame, not the work" }),
-        document.createTextNode(" You → CoS / Claude / Grok CLI. CoS writes only KIP folders. Staff output: report, proposed do, proposed edit."),
-      ])
-    );
+
     if (mintOpen) {
       var card = el("form", {
         className: "mint-card",
@@ -346,12 +272,11 @@
           draw();
         },
       });
-      card.appendChild(el("h2", { text: "Add a construction task" }));
       [
-        ["name", "What construction is this?"],
-        ["constructor", "Who or what can still do it?"],
-        ["inputs", "Required inputs, comma separated"],
-        ["outputs", "Outputs the next task will use"],
+        ["name", "mark"],
+        ["constructor", "who"],
+        ["inputs", "in"],
+        ["outputs", "out"],
       ].forEach(function (pair) {
         var input = el("input", { name: pair[0], placeholder: pair[1], required: pair[0] !== "inputs" });
         input.value = draft[pair[0]];
@@ -360,14 +285,13 @@
         });
         card.appendChild(input);
       });
-      card.appendChild(el("p", { className: "err", text: formError }));
       card.appendChild(
         el("div", { className: "row" }, [
-          el("button", { type: "submit", text: "Place on the graph" }),
+          el("button", { type: "submit", text: "+" }),
           el("button", {
             className: "ghost",
             type: "button",
-            text: "Cancel",
+            text: "×",
             onClick: function () {
               mintOpen = false;
               draw();
@@ -377,18 +301,9 @@
       );
       stage.appendChild(el("div", { className: "overlay" }, [card]));
     }
+
     root.appendChild(stage);
     stage.appendChild(drawWires(stage, view));
-
-    var hint = "Drag a task to move it. Click an output dot, then click an input dot to link. Click a wire, then Break link.";
-    if (live && live.locked) {
-      hint = live.task.name + " cannot run yet. " + waitText(live.missing);
-    } else if (live) {
-      hint = live.task.name + " is the live bottleneck: the constructor can run. Mark its output produced when the input exists.";
-    }
-    if (link && link.fromId) hint = "Linking “" + link.fromOutput + "”. Click an input dot, or click the map to cancel.";
-    if (selectedEdge) hint = "Link selected. Press Break link in the top bar, or click the map to keep it.";
-    root.appendChild(el("div", { className: "hint", text: hint }));
   }
 
   function redrawWires() {
